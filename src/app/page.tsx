@@ -1,101 +1,111 @@
-import Image from "next/image";
+'use client';
+
+import Head from 'next/head';
+import './globals.css';
+import { useState } from 'react';
+import { ChangesDto, compareChangeLogs } from './actions/changeComparison';
+import { ComparisonResult } from './components/ComparisonResult';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  type ChangeLogInput = {
+    changeLogTitle: string, 
+    changeLog: string
+  };
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [highLevelChangeLog, setHighLevelChangeLog] = useState("");
+  const [lowLevelChangeLogs, setLowLevelChangeLogs] = useState<ChangeLogInput[]>([]);
+  const [changeOutput, setChangeOutput] = useState<ChangesDto[]>([]);
+
+  const handleHighLevelChangeLogFileSelection = (e: React.FormEvent<HTMLInputElement>): void => {
+    const target = e.target as HTMLInputElement & {
+      files: FileList
+    };
+    const file = target.files.item(0);
+    const reader = new FileReader();
+    if (file) {
+      reader.readAsText(file);
+      reader.onload = () => {
+        const text = reader.result;
+        if (typeof text === 'string') {
+          setHighLevelChangeLog(text);
+        } else {
+          console.error("Please select a non-empty txt file");
+        }
+      };
+    }
+  };
+
+  const handleLowLevelChangeLogFileSelection = (e: React.FormEvent<HTMLInputElement>): void => {
+    const target = e.target as HTMLInputElement & {
+      files: FileList
+    };
+    for (let i = 0; i < target.files.length; i++) {
+      const file = target.files.item(i);
+      const reader = new FileReader();
+      if (file) {
+        reader.readAsText(file);
+        reader.onload = () => {
+          const text = reader.result;
+          const name = file.name.slice(0, -4);
+          if (typeof text === 'string') {
+            setLowLevelChangeLogs(currentChangeLogs => {
+              return [...currentChangeLogs, {changeLogTitle: name, changeLog: text}];
+            });
+          } else {
+            console.error("Please select a non-empty txt file");
+          }
+        };
+      }
+    }
+  };
+
+  const handleRemoveFile = (i: number): void => {
+    setLowLevelChangeLogs(lowLevelChangeLogs.toSpliced(i, 1))
+  }
+
+  return (
+    <div className="min-h-screen bg-base-200">
+      <Head>
+        <title>Change Log Comparison Tool</title>
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+
+      <main className="container mx-auto p-4">
+        <h1 className="text-4xl font-bold mb-4">Change Log Comparison Tool</h1>
+        <div className="mb-4">
+          <h3 className="text-2xl mb-2">High-level change log</h3>
+          <input
+            type="file"
+            className="file-input file-input-bordered w-full max-w-xs"
+            onChange={e => handleHighLevelChangeLogFileSelection(e)}
+          />
+        </div>
+        <div className="mb-4">
+          <h3 className="text-2xl mb-2">Low-level Change Logs</h3>
+          <input 
+            type="file"
+            multiple
+            className="file-input file-input-bordered w-full max-w-xs"
+            onChange={e => handleLowLevelChangeLogFileSelection(e)}
+          />
+          <div className="flex flex-wrap">
+            {lowLevelChangeLogs.map((lowLevelChangeLog, i) => {
+              return (
+                <div key={i} className="p-4">
+                  <p className="text-lg font-semibold mb-2 flex justify-self-center">{lowLevelChangeLog.changeLogTitle}</p>
+                  <button className="btn btn-accent" onClick={e => handleRemoveFile(i)}>Remove</button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+        <div className="mb-4">
+          <button className="btn btn-primary" onClick={() => setChangeOutput(compareChangeLogs(highLevelChangeLog, lowLevelChangeLogs))}>Compare</button>
+        </div>
+        <div>
+          {changeOutput.map((changeOutput: ChangesDto, i: number) => <ComparisonResult key={i} changeOutput={changeOutput} />)}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
